@@ -1489,19 +1489,34 @@
             background: rgba(0, 0, 0, 0.5);
             z-index: 2000;
             backdrop-filter: blur(5px);
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            pointer-events: none;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .modal {
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%) scale(0.95);
             background: var(--panel-bg);
             border-radius: 8px;
             padding: 20px;
             width: 320px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             border: 1px solid var(--border-color);
+            opacity: 0;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .modal.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
         }
 
         .modal-title {
@@ -1760,14 +1775,6 @@
                 </div>
             </div>
         </div>
-        <a href="https://www.google.com" class="bookmark-item" oncontextmenu="showBookmarkContextMenu(event, this); return false;">
-            <img src="https://www.google.com/favicon.ico" alt="Google">
-            Google
-        </a>
-        <a href="https://www.youtube.com" class="bookmark-item" oncontextmenu="showBookmarkContextMenu(event, this); return false;">
-            <img src="https://www.youtube.com/favicon.ico" alt="YouTube">
-            YouTube
-        </a>
     </div>
 
     <!-- Bookmark Context Menu -->
@@ -1779,6 +1786,22 @@
             Edit
         </div>
         <div class="context-menu-item" onclick="deleteBookmark()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+            Delete
+        </div>
+    </div>
+
+    <!-- Folder Context Menu -->
+    <div class="context-menu" id="folderContextMenu">
+        <div class="context-menu-item" onclick="renameFolder()">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+            </svg>
+            Rename
+        </div>
+        <div class="context-menu-item" onclick="deleteFolder()">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
@@ -1801,6 +1824,36 @@
             <div class="modal-buttons">
                 <button class="modal-btn modal-btn-cancel" onclick="hideBookmarkModal()">Cancel</button>
                 <button class="modal-btn modal-btn-save" onclick="saveBookmark()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Folder Modal -->
+    <div class="modal-overlay" id="renameFolderModal">
+        <div class="modal">
+            <div class="modal-title">Rename Folder</div>
+            <div class="modal-input-group">
+                <label for="folderNameInput">Name</label>
+                <input type="text" id="folderNameInput" class="modal-input" placeholder="Enter folder name">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="hideRenameFolderModal()">Cancel</button>
+                <button class="modal-btn modal-btn-save" onclick="saveNewFolderName()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Folder Confirmation Modal -->
+    <div class="modal-overlay" id="deleteFolderModal">
+        <div class="modal" style="text-align: center;">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="#5f6368" style="margin-bottom: 12px;">
+                 <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            </svg>
+            <div class="modal-title" style="color: #ea4335;">Delete Folder</div>
+            <p style="color: var(--text-color); margin: 16px 0;">Are you sure you want to delete "<strong id="deletingFolderName"></strong>" and all its contents?</p>
+            <div class="modal-buttons" style="justify-content: center;">
+                <button class="modal-btn modal-btn-cancel" onclick="hideDeleteFolderModal()">Cancel</button>
+                <button class="modal-btn" onclick="confirmDeleteFolder()" style="background-color: #ea4335; color: white;">Delete</button>
             </div>
         </div>
     </div>
@@ -2998,8 +3051,31 @@
         let selectedBookmark = null;
         let isEditing = false;
 
+        function showAnimatedModal(modalId) {
+            const modalOverlay = document.getElementById(modalId);
+            if (modalOverlay) {
+                const modal = modalOverlay.querySelector('.modal');
+                modalOverlay.style.display = 'block';
+                setTimeout(() => {
+                    modalOverlay.classList.add('show');
+                    if (modal) modal.classList.add('show');
+                }, 10);
+            }
+        }
+
+        function hideAnimatedModal(modalId) {
+            const modalOverlay = document.getElementById(modalId);
+            if (modalOverlay) {
+                const modal = modalOverlay.querySelector('.modal');
+                modalOverlay.classList.remove('show');
+                if (modal) modal.classList.remove('show');
+                setTimeout(() => {
+                    modalOverlay.style.display = 'none';
+                }, 200); // Match CSS transition duration
+            }
+        }
+
         function showAddBookmarkModal() {
-            const modal = document.getElementById('bookmarkModal');
             const modalTitle = document.getElementById('modalTitle');
             const titleInput = document.getElementById('bookmarkTitle');
             const urlInput = document.getElementById('bookmarkUrl');
@@ -3009,12 +3085,11 @@
             urlInput.value = '';
             isEditing = false;
 
-            modal.style.display = 'block';
+            showAnimatedModal('bookmarkModal');
             titleInput.focus();
         }
 
         function showEditBookmarkModal() {
-            const modal = document.getElementById('bookmarkModal');
             const modalTitle = document.getElementById('modalTitle');
             const titleInput = document.getElementById('bookmarkTitle');
             const urlInput = document.getElementById('bookmarkUrl');
@@ -3025,13 +3100,13 @@
                 urlInput.value = selectedBookmark.href;
                 isEditing = true;
 
-                modal.style.display = 'block';
+                showAnimatedModal('bookmarkModal');
                 titleInput.focus();
             }
         }
 
         function hideBookmarkModal() {
-            document.getElementById('bookmarkModal').style.display = 'none';
+            hideAnimatedModal('bookmarkModal');
             hideBookmarkContextMenu();
         }
 
@@ -3078,19 +3153,34 @@
             }
         }
 
-        function showBookmarkContextMenu(e, bookmark) {
-            const menu = document.getElementById('bookmarkContextMenu');
-            selectedBookmark = bookmark;
-
-            menu.style.display = 'block';
-            menu.style.left = e.pageX + 'px';
-            menu.style.top = e.pageY + 'px';
-
+        function showBookmarkContextMenu(e, item) {
             e.preventDefault();
+            e.stopPropagation();
+
+            // Hide all context menus first
+            hideBookmarkContextMenu();
+
+            selectedBookmark = item;
+            const itemType = selectedBookmark.getAttribute('data-type');
+            
+            let menu;
+            if (itemType === 'folder') {
+                menu = document.getElementById('folderContextMenu');
+            } else {
+                menu = document.getElementById('bookmarkContextMenu');
+            }
+
+            if(menu){
+                menu.style.display = 'block';
+                menu.style.left = e.pageX + 'px';
+                menu.style.top = e.pageY + 'px';
+            }
         }
 
         function hideBookmarkContextMenu() {
             document.getElementById('bookmarkContextMenu').style.display = 'none';
+            const folderMenu = document.getElementById('folderContextMenu');
+            if(folderMenu) folderMenu.style.display = 'none';
         }
 
         function editBookmark() {
@@ -3098,19 +3188,85 @@
         }
 
         function deleteBookmark() {
-            if (selectedBookmark && confirm('Delete this bookmark?')) {
-                selectedBookmark.remove();
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                if (confirm('Are you sure you want to delete this bookmark?')) {
+                    bookmarks.splice(index, 1);
+                    saveBookmarks();
+                    renderBookmarks();
+                }
             }
             hideBookmarkContextMenu();
         }
 
+        function renameFolder() {
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                const folderName = bookmarks[index].name;
+
+                const input = document.getElementById('folderNameInput');
+
+                input.value = folderName;
+                showAnimatedModal('renameFolderModal');
+                input.focus();
+                input.select();
+            }
+            hideBookmarkContextMenu();
+        }
+
+        function hideRenameFolderModal() {
+            hideAnimatedModal('renameFolderModal');
+        }
+
+        function saveNewFolderName() {
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                const input = document.getElementById('folderNameInput');
+                const newName = input.value.trim();
+
+                if (newName && newName !== bookmarks[index].name) {
+                    bookmarks[index].name = newName;
+                    saveBookmarks();
+                    renderBookmarks();
+                }
+            }
+            hideRenameFolderModal();
+        }
+
+        function deleteFolder() {
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                const folderName = bookmarks[index].name;
+
+                const folderNameSpan = document.getElementById('deletingFolderName');
+                
+                folderNameSpan.textContent = folderName;
+                showAnimatedModal('deleteFolderModal');
+            }
+            hideBookmarkContextMenu();
+        }
+
+        function hideDeleteFolderModal() {
+            hideAnimatedModal('deleteFolderModal');
+        }
+
+        function confirmDeleteFolder() {
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                bookmarks.splice(index, 1);
+                saveBookmarks();
+                renderBookmarks();
+            }
+            hideDeleteFolderModal();
+        }
+
         // Close context menu and modal when clicking outside
         document.addEventListener('click', function(e) {
-            if (!e.target.closest('#bookmarkContextMenu')) {
+            if (!e.target.closest('#bookmarkContextMenu') && !e.target.closest('#folderContextMenu')) {
                 hideBookmarkContextMenu();
             }
-            if (e.target.classList.contains('modal-overlay')) {
-                hideBookmarkModal();
+            if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('show')) {
+                hideAnimatedModal(e.target.id);
             }
         });
 
@@ -3249,6 +3405,198 @@
         // Update date immediately and every minute
         updateDate();
         setInterval(updateDate, 60000);
+
+        // Default bookmarks data
+        const defaultBookmarks = [
+            {
+                type: 'bookmark',
+                name: 'Google',
+                url: 'https://www.google.com',
+                icon: 'https://www.google.com/favicon.ico'
+            },
+            {
+                type: 'bookmark',
+                name: 'YouTube',
+                url: 'https://www.youtube.com',
+                icon: 'https://www.youtube.com/favicon.ico'
+            },
+            {
+                type: 'folder',
+                name: 'Social Media',
+                items: [
+                    {
+                        type: 'bookmark',
+                        name: 'Facebook',
+                        url: 'https://www.facebook.com',
+                        icon: 'https://www.facebook.com/favicon.ico'
+                    },
+                    {
+                        type: 'bookmark',
+                        name: 'Twitter',
+                        url: 'https://www.twitter.com',
+                        icon: 'https://www.twitter.com/favicon.ico'
+                    }
+                ]
+            }
+        ];
+
+        // Load or initialize bookmarks
+        let bookmarks = JSON.parse(localStorage.getItem('chromeBookmarks')) || defaultBookmarks;
+
+        // Function to save bookmarks to localStorage
+        function saveBookmarks() {
+            localStorage.setItem('chromeBookmarks', JSON.stringify(bookmarks));
+        }
+
+        // Function to render bookmarks in the bookmark bar
+        function renderBookmarks() {
+            const bookmarkBar = document.querySelector('.bookmark-bar');
+            const addButton = bookmarkBar.querySelector('.add-dropdown');
+            
+            // Clear existing bookmarks but keep the add button
+            const existingBookmarks = bookmarkBar.querySelectorAll('.bookmark-item, .bookmark-folder');
+            existingBookmarks.forEach(item => item.remove());
+            
+            // Render bookmarks after the add button
+            bookmarks.forEach((item, index) => {
+                if (item.type === 'bookmark') {
+                    const bookmark = document.createElement('a');
+                    bookmark.className = 'bookmark-item';
+                    bookmark.href = item.url;
+                    bookmark.draggable = true;
+                    bookmark.innerHTML = `
+                        <img src="${item.icon}" alt="${item.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\'%3E%3Cpath fill=\\'%234285f4\\' d=\\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z\\'/%3E%3C/svg%3E'">
+                        ${item.name}
+                    `;
+                    bookmark.setAttribute('data-index', index);
+                    bookmark.setAttribute('data-type', 'bookmark');
+                    bookmark.addEventListener('contextmenu', (e) => showBookmarkContextMenu(e, bookmark));
+                    
+                    // Add drag event listeners
+                    bookmark.addEventListener('dragstart', handleDragStart);
+                    bookmark.addEventListener('dragend', handleDragEnd);
+                    bookmark.addEventListener('dragover', handleDragOver);
+                    bookmark.addEventListener('dragenter', handleDragEnter);
+                    bookmark.addEventListener('dragleave', handleDragLeave);
+                    bookmark.addEventListener('drop', handleDrop);
+                    
+                    bookmarkBar.appendChild(bookmark);
+                } else if (item.type === 'folder') {
+                    const folder = document.createElement('div');
+                    folder.className = 'bookmark-folder';
+                    folder.draggable = true;
+                    folder.innerHTML = `
+                        <svg viewBox="0 0 24 24">
+                            <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                        </svg>
+                        ${item.name}
+                    `;
+                    folder.setAttribute('data-index', index);
+                    folder.setAttribute('data-type', 'folder');
+                    folder.addEventListener('contextmenu', (e) => showBookmarkContextMenu(e, folder));
+                    
+                    // Add drag event listeners
+                    folder.addEventListener('dragstart', handleDragStart);
+                    folder.addEventListener('dragend', handleDragEnd);
+                    folder.addEventListener('dragover', handleDragOver);
+                    folder.addEventListener('dragenter', handleDragEnter);
+                    folder.addEventListener('dragleave', handleDragLeave);
+                    folder.addEventListener('drop', handleDrop);
+                    
+                    bookmarkBar.appendChild(folder);
+                }
+            });
+        }
+
+        // Modify saveBookmark function to save to localStorage
+        function saveBookmark() {
+            const titleInput = document.getElementById('bookmarkTitle');
+            const urlInput = document.getElementById('bookmarkUrl');
+            
+            if (titleInput.value && urlInput.value) {
+                try {
+                    let url = urlInput.value;
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'https://' + url;
+                    }
+
+                    const newBookmark = {
+                        type: 'bookmark',
+                        name: titleInput.value,
+                        url: url,
+                        icon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`
+                    };
+
+                    if (isEditing && selectedBookmark) {
+                        const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                        bookmarks[index] = newBookmark;
+                    } else {
+                        bookmarks.push(newBookmark);
+                    }
+
+                    saveBookmarks();
+                    renderBookmarks();
+                    hideBookmarkModal();
+                    
+                    titleInput.value = '';
+                    urlInput.value = '';
+                } catch (error) {
+                    console.error('Error saving bookmark:', error);
+                }
+            }
+        }
+
+        // Modify createNewFolder function to save to localStorage
+        function createNewFolder() {
+            const newFolder = {
+                type: 'folder',
+                name: 'New Folder',
+                items: []
+            };
+            
+            bookmarks.push(newFolder);
+            saveBookmarks();
+            renderBookmarks();
+            
+            closeAddDropdown();
+        }
+
+        // Modify deleteBookmark function to remove from localStorage
+        function deleteBookmark() {
+            if (selectedBookmark) {
+                const index = parseInt(selectedBookmark.getAttribute('data-index'));
+                bookmarks.splice(index, 1);
+                saveBookmarks();
+                renderBookmarks();
+            }
+            hideBookmarkContextMenu();
+        }
+
+        // Modify handleDrop function to update localStorage
+        function handleDrop(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (draggedItem !== this) {
+                const items = [...document.querySelectorAll('.bookmark-folder, .bookmark-item')];
+                const fromIndex = parseInt(draggedItem.getAttribute('data-index'));
+                const toIndex = parseInt(this.getAttribute('data-index'));
+                
+                const [movedItem] = bookmarks.splice(fromIndex, 1);
+                bookmarks.splice(toIndex, 0, movedItem);
+                
+                saveBookmarks();
+                renderBookmarks();
+            }
+            
+            this.classList.remove('drag-over');
+            return false;
+        }
+
+        // Initialize bookmarks on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBookmarks();
+        });
     </script>
     <div class="notification" id="notification">
         <svg class="notification-icon" viewBox="0 0 24 24">
